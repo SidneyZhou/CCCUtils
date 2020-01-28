@@ -1,0 +1,8 @@
+{
+	"name": "res_packer",
+	"version": "0.0.1",
+	"description": "资源分包插件",
+	"author": "imageme",
+	"main": "main.js",
+	"main-menu": {}
+}
