@@ -2,13 +2,23 @@
  * 资源分包插件
  */
 'use strict';
-
-const PackOnDebug = true;
-const TempDir = '../res-temp';
-const BackupDir = '../res';
-
 const Path = require('fire-path');
 const Fs = require('fire-fs');
+
+const PackOnDebug = true; // 是否需要在调试模式下打包
+const TempDir = '../res-temp'; // 资源的临时文件夹，脚本运行过程中会从这个文件夹中剪切资源
+const BackupDir = '../res'; // res备份的目录
+
+/**
+ * 子包配置
+ * isStartScene: 是否是初始场景（creator自带资源会打入这个配置所在的文件夹中）
+ * targetDir: 子包所处的文件夹
+ * folders: 子包所依赖的资源文件夹
+ */
+const PackerCfgs = [
+	{isStartScene: true, targetDir: 'res', folders: ['01-load']},
+	{targetDir: 'res'/*'res_03-content'*/, folders: ['03-content', 'resources/03-content']},
+]
 
 function getMd5ByUuid(buildResults, uuid) {
 	return buildResults._md5Map[uuid] || buildResults._nativeMd5Map[uuid];
@@ -64,7 +74,7 @@ function copyFile(src, dst) {
 			// Editor.log(`copy file ${src} ---> ${dst}`);
 		}
 	} catch (error) {
-		
+		Editor.log('copyFile', src, err); // 似乎不会走到这个地方来
 	}
 }
 
@@ -84,26 +94,28 @@ function onBeforeBuildFinish(options, callback) {
 function onBuildFinish(options, callback) {
 
 	if (options.actualPlatform === 'wechatgame' && (PackOnDebug || !options.debug) && options.md5Cache) {
-		let firstSrc = Path.join(options.dest, 'res');
-		Fs.copySync(firstSrc, Path.join(options.dest, TempDir));
-		Fs.copySync(firstSrc, Path.join(options.dest, BackupDir));
-		Fs.removeSync(firstSrc);
-		packerRes(options, callback);
+		let defaultSrc = Path.join(options.dest, 'res');
+		let tempSrc = Path.join(options.dest, TempDir);
+		Fs.copySync(defaultSrc, tempSrc);
+		Fs.copySync(defaultSrc, Path.join(options.dest, BackupDir));
+		Fs.removeSync(defaultSrc);
+		for(let i = 0; i < PackerCfgs.length; i++) {
+			packerRes(options, callback, tempSrc, PackerCfgs[i]);
+		}
 	}
 }
 
-function packerRes(options, callback) {
-	let backupSrc = Path.join(options.dest, TempDir);
-	let firstSrc = Path.join(options.dest, 'res');
-	Fs.ensureDirSync(firstSrc);
+function packerRes(options, callback, tempSrc, packerCfg) {
+	let targetSrc = Path.join(options.dest, packerCfg.targetDir);
+	Fs.ensureDirSync(targetSrc);
 
 	let buildResults = options.buildResults;
 
 		function copyAssetByUuid(uuid) {
 			let md5 = getMd5ByUuid(buildResults, uuid);
 			if (md5) {
-				let src = getFilePath(buildResults, backupSrc, uuid, md5);
-				let dst = getFilePath(buildResults, firstSrc, uuid, md5);
+				let src = getFilePath(buildResults, tempSrc, uuid, md5);
+				let dst = getFilePath(buildResults, targetSrc, uuid, md5);
 				copyFile(src, dst);
 			}
 		}
@@ -137,13 +149,17 @@ function packerRes(options, callback) {
 		}
 
 		// 打包引擎内置的effects和materials
-		queryAssets('db://internal/resources/**/*');
+		packerCfg.isStartScene && queryAssets('db://internal/resources/**/*');
 
 		// 打包启动场景资源
 		// 方法1：读路径 queryAssets('db://assets/Scene/LaunchScene.fire');
 		// 方法2：读配置
-		var startSceneUuid = options.startScene;
-		copyAssets([startSceneUuid]);
+		// var startSceneUuid = options.startScene;
+		// copyAssets([startSceneUuid]);
+
+		for (let i = 0; i < packerCfg.folders.length; i++) {
+			queryAssets(`db://assets/${packerCfg.folders[i]}/**/*`);
+		}
 
 	callback();
 }
