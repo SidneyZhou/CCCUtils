@@ -39,7 +39,7 @@
   "title": "CCCUtils",
   "webOrientation": "auto",
   "wechatgame": {
-    "REMOTE_SERVER_ROOT": "",
+    "REMOTE_SERVER_ROOT": "http://q4yvts7ev.bkt.clouddn.com/test1/",
     "appid": "wx6ac3f5090a6b99c5",
     "orientation": "landscapeRight",
     "separate_engine": false,

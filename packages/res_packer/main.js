@@ -14,11 +14,11 @@ const BackupDir = '../res'; // res备份的目录
  * isStartScene: 是否是初始场景（creator自带资源会打入这个配置所在的文件夹中）
  * targetDir: 子包所处的文件夹
  * folders: 子包所依赖的资源文件夹
- */
 const PackerCfgs = [
 	{isStartScene: true, targetDir: 'res', folders: ['01-load']},
-	{targetDir: 'res'/*'res_03-content'*/, folders: ['03-content', 'resources/03-content']},
+	{targetDir: 'res_03-content', folders: ['03-content', 'resources/03-content']},
 ]
+*/
 
 function getMd5ByUuid(buildResults, uuid) {
 	return buildResults._md5Map[uuid] || buildResults._nativeMd5Map[uuid];
@@ -66,15 +66,11 @@ function getFilePath(buildResults, resDir, uuid, md5) {
 	return Path.join(dir, `${uuid}.${md5}.${extension}`);
 }
 
-function copyFile(src, dst) {
-	try {
-		if (!Fs.existsSync(dst)) {
-			Fs.copySync(src, dst);
-			Fs.removeSync(src);
-			// Editor.log(`copy file ${src} ---> ${dst}`);
-		}
-	} catch (error) {
-		Editor.log('copyFile', src, err); // 似乎不会走到这个地方来
+function moveFile(src, dst) {
+	if (Fs.existsSync(src) && !Fs.existsSync(dst)) {
+		Fs.copySync(src, dst);
+		Fs.removeSync(src);
+		// Editor.log(`copy file ${src} ---> ${dst}`);
 	}
 }
 
@@ -96,9 +92,11 @@ function onBuildFinish(options, callback) {
 	if (options.actualPlatform === 'wechatgame' && (PackOnDebug || !options.debug) && options.md5Cache) {
 		let defaultSrc = Path.join(options.dest, 'res');
 		let tempSrc = Path.join(options.dest, TempDir);
-		Fs.copySync(defaultSrc, tempSrc);
-		Fs.copySync(defaultSrc, Path.join(options.dest, BackupDir));
+		Fs.copySync(defaultSrc, tempSrc); // 复制到临时文件夹
+		Fs.copySync(defaultSrc, Path.join(options.dest, BackupDir)); // 备份用以上传
 		Fs.removeSync(defaultSrc);
+		let fileData = Fs.readFileSync(__dirname + '/../../res_packer_cfg.json', 'utf8');
+		let PackerCfgs = JSON.parse(fileData);
 		for(let i = 0; i < PackerCfgs.length; i++) {
 			packerRes(options, callback, tempSrc, PackerCfgs[i]);
 		}
@@ -111,30 +109,30 @@ function packerRes(options, callback, tempSrc, packerCfg) {
 
 	let buildResults = options.buildResults;
 
-		function copyAssetByUuid(uuid) {
+		function moveAssetByUuid(uuid) {
 			let md5 = getMd5ByUuid(buildResults, uuid);
 			if (md5) {
 				let src = getFilePath(buildResults, tempSrc, uuid, md5);
 				let dst = getFilePath(buildResults, targetSrc, uuid, md5);
-				copyFile(src, dst);
+				moveFile(src, dst);
 			}
 		}
 
-		function copyAssets(uuids) {
+		function moveAssets(uuids) {
 			for (let i = 0; i < uuids.length; ++i) {
 				let uuid = uuids[i];
 				let asset = buildResults._buildAssets[uuid];
 				if (asset && buildResults.getAssetType(uuid) != 'folder') {
 
-					copyAssetByUuid(uuid);
+					moveAssetByUuid(uuid);
 
 					// 依赖数据
 					let asset = buildResults._buildAssets[uuid];
-					asset && asset.dependUuids && copyAssets(asset.dependUuids); // 递归依赖
+					asset && asset.dependUuids && moveAssets(asset.dependUuids); // 递归依赖
 
 					// 合并数据
 					let packedUuid = getUuidFromPackedAssets(buildResults, uuid);
-					packedUuid && copyAssetByUuid(packedUuid);
+					packedUuid && moveAssetByUuid(packedUuid);
 				}
 			}
 		}
@@ -143,7 +141,7 @@ function packerRes(options, callback, tempSrc, packerCfg) {
 			Editor.assetdb.queryAssets(dbPath, null, (err, assetInfos) => {
 				if (!err) {
 					let array = assetInfos.map(x => x.uuid);
-					copyAssets(array);
+					moveAssets(array);
 				}
 			});
 		}
@@ -155,7 +153,7 @@ function packerRes(options, callback, tempSrc, packerCfg) {
 		// 方法1：读路径 queryAssets('db://assets/Scene/LaunchScene.fire');
 		// 方法2：读配置
 		// var startSceneUuid = options.startScene;
-		// copyAssets([startSceneUuid]);
+		// moveAssets([startSceneUuid]);
 
 		for (let i = 0; i < packerCfg.folders.length; i++) {
 			queryAssets(`db://assets/${packerCfg.folders[i]}/**/*`);
