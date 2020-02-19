@@ -10,13 +10,27 @@ const TempDir = '../res-temp'; // 资源的临时文件夹，脚本运行过程�
 const BackupDir = '../res'; // res备份的目录
 
 /**
- * 子包配置
+ * 子包配置文件
  * isStartScene: 是否是初始场景（creator自带资源会打入这个配置所在的文件夹中）
  * targetDir: 子包所处的文件夹
  * folders: 子包所依赖的资源文件夹
-const PackerCfgs = [
-	{isStartScene: true, targetDir: 'res', folders: ['01-load']},
-	{targetDir: 'res_03-content', folders: ['03-content', 'resources/03-content']},
+
+ /../../res_packer_cfg.json
+[
+    {
+        "isStartScene": true,
+        "targetDir": "res",
+        "folders": [
+            "01-load"
+        ]
+    },
+    {
+        "targetDir": "res_03-content",
+        "folders": [
+            "03-content",
+            "resources/03-content"
+        ]
+    }
 ]
 */
 
